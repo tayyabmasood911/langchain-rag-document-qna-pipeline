@@ -1,128 +1,109 @@
-# :rocket: Langchain Rag Document Qna Pipeline
+# LangChain Enterprise RAG Document Q&A Pipeline
 
-<div align="center">
+[![CI Pipeline](https://github.com/tayyabmasood911/langchain-rag-document-qna-pipeline/actions/workflows/ci.yml/badge.svg)](https://github.com/tayyabmasood911/langchain-rag-document-qna-pipeline/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![LangChain](https://img.shields.io/badge/Orchestrator-LangChain_v0.2-1C3C3C.svg)](https://langchain.com)
+[![ChromaDB](https://img.shields.io/badge/Vector_Store-ChromaDB-orange.svg)](https://trychroma.com)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com)
 
-[![Status](https://img.shields.io/badge/status-production--ready-brightgreen?style=for-the-badge&logo=git)]()
-[![Domain](https://img.shields.io/badge/domain-AI--Engineering--and--LLMOps-blueviolet?style=for-the-badge)]()
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=for-the-badge&logo=github)](https://github.com/T9113/langchain-rag-document-qna-pipeline/pulls)
-[![Security Hardened](https://img.shields.io/badge/security-hardened-red?style=for-the-badge&logo=shield)]()
-
-</div>
+A production-grade Retrieval-Augmented Generation (RAG) pipeline built with LangChain, ChromaDB persistent vector database, semantic recursive character chunking, Maximal Marginal Relevance (MMR) diversity reranking, and a high-performance FastAPI query endpoint.
 
 ---
 
-## :memo: Executive Summary
+## Architecture Overview
 
-**Langchain Rag Document Qna Pipeline** is an enterprise-grade production engineering implementation designed for mission-critical deployments. Built to meet stringent requirements for **99.99% availability**, zero-trust security boundaries, automated resilience, and seamless CI/CD delivery.
+![LangChain RAG Architecture](docs/architecture.svg)
 
-Key operational outcomes:
-- **Resilience:** Multi-zone high availability with automated fault detection and recovery.
-- **Scalability:** Elastic horizontal scaling responsive to real-time workload demand.
-- **Security:** Strict adherence to least-privilege RBAC, encrypted communications, and zero committed secrets.
-- **Maintainability:** Modular, declarative configuration aligned with cloud-native industry standards.
+The pipeline executes a strictly controlled three-phase workflow designed to eliminate LLM hallucinations:
 
----
-
-## :building_construction: System Architecture
-
-```text
-+-------------------------------------------------------------------------------+
-|                       Langchain Rag Document Qna Pipeline Architecture Blueprint                    |
-|                                                                               |
-|   [Client Ingress] ===> [API Gateway / Traffic Router (TLS 1.3 / mTLS)]       |
-|                                     |                                         |
-|                                     v                                         |
-|                         [Core Workload Cluster]                               |
-|                         (Multi-Replica / Multi-AZ)                            |
-|                                     |                                         |
-|                 +-------------------+-------------------+                     |
-|                 |                                       |                     |
-|                 v                                       v                     |
-|     [Persistence & Storage Layer]           [Observability & Telemetry Engine]|
-|      (Encrypted at Rest / KMS)              (Prometheus / OTLP / OpenSearch)  |
-+-------------------------------------------------------------------------------+
-```
+1. **Ingestion & Semantic Chunking**: Raw enterprise documents are partitioned using `RecursiveCharacterTextSplitter` (1000 chunk size, 200 overlap) to preserve contextual boundaries and metadata lineage.
+2. **Persistent Vector Storage & MMR Reranking**: Chunks are embedded and indexed in ChromaDB using HNSW cosine index graphs. Queries retrieve an initial candidate pool (`fetch_k=20`) and apply Maximal Marginal Relevance (`top_k=5`, `lambda_mult=0.7`) to maximize information coverage while discarding semantic duplicates.
+3. **Synthesis & API Serving**: A FastAPI REST server processes incoming queries, formats source documents with strict citations, grounds generation using zero-temperature parameters, and returns answers alongside full source lineage.
 
 ---
 
-## :sparkles: Key Enterprise Capabilities
+## Core Features
 
-- :zap: **High Availability & Fault Tolerance:** Eliminates single points of failure via multi-node redundancy and health check probes.
-- :shield: **Zero-Trust Security Posture:** Enforces non-root runtime environments, ephemeral credentials, and automated vulnerability scanning.
-- :chart_with_upwards_trend: **Elastic Autoscaling:** Dynamic resource provisioning based on custom throughput, memory pressure, and queue depth.
-- :mag: **Full-Stack Observability:** Standardized structured telemetry, metrics instrumentation, and distributed request tracing.
-- :package: **GitOps & CI/CD Automation:** Infrastructure and configuration managed declaratively with automated testing and continuous deployment.
-
----
-
-## :file_folder: Repository Directory Structure
-
-```text
-.
-|-- config/              # Declarative configuration and environment definitions
-|-- src/                 # Production source code and manifests
-|-- scripts/             # Operational automation, setup, and maintenance scripts
-|-- tests/               # Comprehensive validation and unit test suites
-|-- LICENSE              # MIT Open Source License
-`-- README.md            # Enterprise architectural documentation
-```
+- **Semantic Recursive Chunking**: Dynamic paragraph, sentence, and phrase boundary detection ensuring context does not get truncated abruptly.
+- **Maximal Marginal Relevance (MMR)**: Replaces standard nearest-neighbor search with diversity-optimized reranking, preventing redundant passages from consuming LLM context window space.
+- **ChromaDB Persistent Store**: Built-in on-disk persistence for embedding vectors, collection indexing, and metadata tagging.
+- **FastAPI Production Service**: Fully documented REST endpoints (`/query`, `/ingest`, `/health`, `/docs`) with Pydantic validation schemas.
+- **Comprehensive Lineage Tracking**: Every answer links back to exact source passages with character offsets, document names, and latency benchmarks.
 
 ---
 
-## :zap: Quick Start & Deployment
+## Quick Start
 
-### Prerequisites
-- Git `>= 2.40`
-- Docker Engine `>= 24.0` / Cloud CLI (AWS / GCP / Azure / Kubernetes)
-
-### Deployment Steps
+### 1. Install Dependencies
 ```bash
-# 1. Clone the repository
-git clone https://github.com/T9113/langchain-rag-document-qna-pipeline.git
-cd langchain-rag-document-qna-pipeline
+pip install -r requirements.txt
+```
 
-# 2. Inspect and configure environment parameters
-cp config/example.env config/.env
+### 2. Configure Environment
+```bash
+cp config/production.env.example .env
+# Edit .env and supply your OPENAI_API_KEY
+```
 
-# 3. Validate configurations and syntax
-# Run linters, dry-run validations, or unit test suites
+### 3. Launch FastAPI Server
+```bash
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
 
-# 4. Deploy workloads / infrastructure
-# Execute deployment manifests or container runtime
+### 4. Ingest Documents
+```bash
+curl -X POST http://localhost:8000/ingest \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Retrieval-Augmented Generation (RAG) optimizes LLM output by referencing an authoritative knowledge base outside of its training data before generating a response. Maximal Marginal Relevance (MMR) balances relevance and diversity.",
+    "source": "architecture-overview.md"
+  }'
+```
+
+### 5. Query the Pipeline
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "How does MMR optimize retrieval?",
+    "top_k": 3,
+    "lambda_mult": 0.7
+  }'
 ```
 
 ---
 
-## :gear: Configuration Reference
+## Configuration Reference
 
-| Parameter | Type | Default | Description |
-| :--- | :--- | :--- | :--- |
-| `ENVIRONMENT` | string | `production` | Deployment environment target (`staging`, `production`) |
-| `LOG_LEVEL` | string | `info` | Structured logging verbosity (`debug`, `info`, `warn`, `error`) |
-| `METRICS_ENABLED` | boolean | `true` | Enables real-time Prometheus / OpenTelemetry telemetry export |
-| `TLS_MIN_VERSION` | string | `TLSv1.3` | Minimum allowable TLS protocol version for network traffic |
+Key variables defined in `.env`:
 
----
-
-## :lock: Security, Compliance & Governance
-
-1. **Least-Privilege Execution:** Services run under restricted service accounts with zero root permissions.
-2. **Encrypted Data In-Flight & At-Rest:** AES-256 / KMS envelope encryption for persistent state and TLS 1.3 for network transport.
-3. **Automated Supply Chain Security:** All dependencies and container images verified against CVE databases using Trivy and Semgrep.
-4. **Zero-Secret Guarantee:** No hardcoded tokens, passwords, or private keys exist in this codebase.
+| Parameter | Default | Description |
+| :--- | :--- | :--- |
+| `API_PORT` | `8000` | Port for the FastAPI server |
+| `MODEL_NAME` | `gpt-4o` | LLM model for contextual answer synthesis |
+| `TEMPERATURE` | `0.0` | Model temperature (0.0 for deterministic answers) |
+| `CHROMA_PERSIST_DIR` | `./chroma_db` | On-disk storage path for ChromaDB index |
+| `CHUNK_SIZE` | `1000` | Target character count per text chunk |
+| `CHUNK_OVERLAP` | `200` | Overlap character count between consecutive chunks |
+| `MMR_TOP_K` | `5` | Number of documents returned after MMR reranking |
+| `MMR_LAMBDA_MULT` | `0.7` | Tradeoff factor (0 = maximum diversity, 1 = maximum relevance) |
 
 ---
 
-## :bust_in_silhouette: Author & Maintainer
+## Verification & Testing
 
-**Tayyab Masood**  
-Cloud Solutions Architect & Senior DevOps Engineer  
-- :globe_with_meridians: **GitHub:** [@T9113](https://github.com/T9113)  
-- :scroll: **Certification:** AWS Certified Solutions Architect - Associate  
+Execute the automated test suite:
+```bash
+python3 -m unittest discover -s tests -p "test_*.py"
+```
+
+Verify service health:
+```bash
+bash scripts/healthcheck.sh
+```
 
 ---
 
-## :page_facing_up: License
+## Security & Responsible Disclosure
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+Please review our [SECURITY.md](SECURITY.md) for vulnerability disclosure procedures. All security inquiries should be directed to [tayyabmasood911@gmail.com](mailto:tayyabmasood911@gmail.com).
